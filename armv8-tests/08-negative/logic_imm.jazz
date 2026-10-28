@@ -1,0 +1,3 @@
+// Logical operations accept only bitmask immediates.
+// EXPECT: logical bitmask immediate
+export fn f(reg u64 a) -> reg u64 { a &= 0x123456789abcdef0; return a; }

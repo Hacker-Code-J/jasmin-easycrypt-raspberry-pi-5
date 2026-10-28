@@ -1,0 +1,3 @@
+// No vector (NEON/SIMD) register bank on this target.
+// EXPECT: bank .vector. is empty
+export fn f(reg u64 p) { reg u128 x; x = (128u)[p]; [:u128 p + 16] = x; }

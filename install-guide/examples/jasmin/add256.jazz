@@ -1,0 +1,24 @@
+// 256-bit addition with carry propagation (four 64-bit limbs),
+// written for the ARMv8-A (AArch64) back-end of the Jasmin compiler.
+//   rp[0..3] = ap[0..3] + bp[0..3]  (mod 2^256)
+export
+fn add256(reg u64 rp ap bp) -> reg u64 {
+  reg u64 a b carry zero;
+  reg bool cf;
+  inline int i;
+
+  a = [ap];
+  b = [bp];
+  cf, a = a + b;            // ADDS: sets the carry flag
+  [rp] = a;
+  for i = 1 to 4 {
+    a = [ap + 8 * i];
+    b = [bp + 8 * i];
+    cf, a += b + cf;        // ADCS: add with carry
+    [rp + 8 * i] = a;
+  }
+  zero = 0;
+  carry = 0;
+  _, carry += zero + cf;    // ADC with register operands only: carry = cf
+  return carry;
+}

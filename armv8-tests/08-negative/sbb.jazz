@@ -1,0 +1,3 @@
+// Generic subtract-with-borrow: the borrow flag cannot be allocated (use SUBS + MVN + ADC).
+// EXPECT: remain unallocated
+export fn f(reg u64 a b c d) -> reg u64, reg u64 { reg bool cf; cf, a -= c; _, b -= d - cf; return a, b; }

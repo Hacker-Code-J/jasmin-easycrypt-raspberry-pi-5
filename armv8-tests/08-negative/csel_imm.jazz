@@ -1,0 +1,3 @@
+// Conditional moves take register operands only.
+// EXPECT: Is there an instruction in the target architecture
+export fn f(reg u64 a b) -> reg u64 { reg u64 r; reg bool c; r = 0; c = a < b; r = 1 if c; return r; }

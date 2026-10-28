@@ -1,0 +1,3 @@
+// ADC has no immediate operand form.
+// EXPECT: ADC_64 is given incompatible args
+export fn f(reg u64 a b) -> reg u64 { reg bool cf; reg u64 c; cf, a += b; c = 0; _, c += 0 + cf; return c; }

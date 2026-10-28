@@ -1,0 +1,3 @@
+// Export functions take at most 8 arguments (no stack-passed arguments).
+// EXPECT: too many parameters according to the ABI
+export fn f(reg u64 a b c d e g h i j) -> reg u64 { a += j; return a; }

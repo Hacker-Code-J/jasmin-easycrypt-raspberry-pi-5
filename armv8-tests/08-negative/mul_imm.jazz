@@ -1,0 +1,3 @@
+// MUL has no immediate operand form.
+// EXPECT: MUL_64 is given incompatible args
+export fn f(reg u64 a) -> reg u64 { a = a * 3; return a; }

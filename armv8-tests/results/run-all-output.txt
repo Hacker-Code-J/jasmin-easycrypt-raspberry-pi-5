@@ -1,0 +1,202 @@
+== Environment
+   Raspberry Pi 5 Model B Rev 1.0, Linux 6.12.93+rpt-rpi-2712 aarch64
+   Jasmin Compiler 2026.09.0, EasyCrypt r2026.07
+   gcc (Debian 12.2.0-14+deb12u1) 12.2.0, OpenSSL 3.0.20 7 Apr 2026 (Library: OpenSSL 3.0.20 7 Apr 2026)
+
+== Stage 1: upstream Jasmin tests on ARMv8-A (compile, assemble, CT, EasyCrypt)
+   started 23:35:56
+  [PASS] upstream armv8a: 16/16 compiled with -arch armv8a and assembled by GNU as
+  [PASS] upstream stack_zeroization: 1/1 compiled with -arch armv8a and assembled by GNU as
+  [PASS] upstream common: 51/55 compiled with -arch armv8a and assembled by GNU as, 4 known internal compiler errors (mulu_32, swap_32)
+  [PASS] jasmin-ct accepts add_poly.jazz
+  [PASS] jasmin-ct accepts bug_746.jazz
+  [PASS] jasmin-ct accepts declassify_load.jazz
+  [PASS] jasmin-ct accepts div.jazz
+  [PASS] jasmin-ct accepts doc_add2.jazz
+  [PASS] jasmin-ct accepts doc_add_SP.jazz
+  [PASS] jasmin-ct accepts doc_add_restr.jazz
+  [PASS] jasmin-ct accepts doc_load_mem.jazz
+  [PASS] jasmin-ct accepts doc_set0_incr.jazz
+  [PASS] jasmin-ct accepts doc_store.jazz
+  [PASS] jasmin-ct accepts doc_zero.jazz
+  [PASS] jasmin-ct accepts otp_declassify_if.jazz
+  [PASS] jasmin-ct accepts randombytes.jazz
+  [PASS] jasmin-ct accepts sct.jazz
+  [PASS] jasmin-ct accepts unused_poly.jazz
+  [PASS] jasmin-ct rejects H_L_L.jazz
+  [PASS] jasmin-ct rejects div_secret.jazz
+  [PASS] jasmin-ct rejects doc_bad_call.jazz
+  [PASS] jasmin-ct rejects doc_leak_arr_load.jazz
+  [PASS] jasmin-ct rejects doc_leak_cond.jazz
+  [PASS] jasmin-ct rejects doc_leak_store.jazz
+  [PASS] jasmin-ct rejects load_on_poly.jazz
+  [PASS] jasmin-ct rejects load_on_secret.jazz
+  [PASS] jasmin-ct rejects mod_secret.jazz
+  [PASS] jasmin-ct rejects otp_if.jazz
+  [PASS] jasmin-ct rejects randombytes.jazz
+  [PASS] jasmin-ct rejects secret_ptr.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of add.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of addcarry.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of and.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of call.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of csel.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of div.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of intrinsics.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of ldst.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of loop.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of mul.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of or.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of shift.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of sub.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of swap.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of unaligned_stackalign.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of word32.jazz
+  [PASS] jasmin2ec + EasyCrypt type-check of stack-zeroization.jazz
+
+== Stage 2: differential testing: reference interpreter vs native execution
+   started 23:38:52
+  [PASS] add.jazz:add  2000 agree, 0 mismatch
+  [PASS] addcarry.jazz:addcarry  2000 agree, 0 mismatch
+  [PASS] and.jazz:and  2000 agree, 0 mismatch
+  [PASS] call.jazz:call  2000 agree, 0 mismatch
+  [PASS] csel.jazz:csel  2000 agree, 0 mismatch
+  [PASS] div.jazz:div  1970 agree, 30 undefined, 0 mismatch
+  [PASS] intrinsics.jazz:intrinsics  2000 agree, 0 mismatch
+  [PASS] loop.jazz:loop  2000 agree, 0 mismatch
+  [PASS] mul.jazz:mul  2000 agree, 0 mismatch
+  [PASS] or.jazz:or  2000 agree, 0 mismatch
+  [PASS] shift.jazz:shift  2000 agree, 0 mismatch
+  [PASS] sub.jazz:sub  2000 agree, 0 mismatch
+  [PASS] swap.jazz:swap  2000 agree, 0 mismatch
+  [PASS] unaligned_stackalign.jazz:instack  2000 agree, 0 mismatch
+  [PASS] word32.jazz:arith32  1959 agree, 41 undefined, 0 mismatch
+  [PASS] word32.jazz:logic32  2000 agree, 0 mismatch
+  [PASS] word32.jazz:shift32  2000 agree, 0 mismatch
+  [PASS] word32.jazz:csel32  2000 agree, 0 mismatch
+  [PASS] isa.jazz:add128  5000 agree, 0 mismatch
+  [PASS] isa.jazz:sub128  5000 agree, 0 mismatch
+  [PASS] isa.jazz:sub_carry  5000 agree, 0 mismatch
+  [PASS] isa.jazz:mul64x64  5000 agree, 0 mismatch
+  [PASS] isa.jazz:madd_msub  5000 agree, 0 mismatch
+  [PASS] isa.jazz:rot64  5000 agree, 0 mismatch
+  [PASS] isa.jazz:rot32  5000 agree, 0 mismatch
+  [PASS] isa.jazz:shifts  5000 agree, 0 mismatch
+  [PASS] isa.jazz:logic  5000 agree, 0 mismatch
+  [PASS] isa.jazz:popcount  5000 agree, 0 mismatch
+  [PASS] isa.jazz:compare  5000 agree, 0 mismatch
+  [PASS] isa.jazz:casts  5000 agree, 0 mismatch
+  [PASS] isa.jazz:word32_wrap  5000 agree, 0 mismatch
+  [PASS] isa.jazz:gcd  5000 agree, 0 mismatch
+  [PASS] isa.jazz:collatz  5000 agree, 0 mismatch
+  [PASS] isa.jazz:pressure  5000 agree, 0 mismatch
+  [PASS] isa.jazz:arrays  5000 agree, 0 mismatch
+  [PASS] isa models: 1000000 tests
+  [PASS] upstream ldst/ldst32 vs C model: 1000000 tests
+
+== Stage 3: AAPCS64 conformance: callee-saved registers, 32-bit arguments, stack zeroization
+   started 23:40:02
+  [PASS] callee-saved pressure     x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved gcd          x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved arrays       x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved collatz      x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved compare      x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved sz_none      x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved sz_loop      x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] callee-saved sz_unrolled  x19-x29, d8-d15, sp preserved (20000 calls)
+  [PASS] dirty upper halves  arith32      0/200000 results differ
+  [PASS] dirty upper halves  logic32      0/200000 results differ
+  [PASS] dirty upper halves  shift32      0/200000 results differ
+  [PASS] dirty upper halves  csel32       0/200000 results differ
+  [PASS] dirty upper halves  rot32        0/200000 results differ
+  [PASS] dirty upper halves  word32_wrap  0/200000 results differ
+  [PASS] stack after sz_none      secret words: 31, return addresses: 1, zeroed words:  1, other: 0
+  [PASS] stack after sz_loop      secret words:  0, return addresses: 1, zeroed words: 32, other: 0
+  [PASS] stack after sz_unrolled  secret words:  0, return addresses: 1, zeroed words: 32, other: 0
+
+== Stage 4: cryptographic kernels: ChaCha20 and Poly1305 vs RFC 8439 and OpenSSL
+   started 23:40:03
+  [PASS] chacha20_block: RFC 8439 2.3.2 test vector
+  [PASS] chacha20_block vs OpenSSL EVP_chacha20: 200000 tests
+  [PASS] poly1305: RFC 8439 2.5.2 test vector
+  [PASS] poly1305 vs OpenSSL EVP_MAC (lengths 0..300): 62608 tests
+
+== Stage 5: constant time: jasmin-ct, speculative CT, and timing measurements
+   started 23:40:05
+  [PASS] jasmin-ct accepts ct_memeq
+  [PASS] jasmin-ct --doit accepts ct_memeq
+  [PASS] jasmin-ct accepts ct_cswap4
+  [PASS] jasmin-ct --doit accepts ct_cswap4
+  [PASS] jasmin-ct accepts ct_lookup16
+  [PASS] jasmin-ct --doit accepts ct_lookup16
+  [PASS] jasmin-ct rejects leaky_memeq
+  [PASS] jasmin-ct rejects leaky_cswap4
+  [PASS] jasmin-ct rejects leaky_lookup16
+  [PASS] jasmin-ct rejects leaky_div
+  [PASS] jasmin-ct accepts chacha20
+  [PASS] jasmin-ct --doit accepts chacha20
+  [PASS] jasmin-ct --sct rejects chacha20 (no SLH protections)
+  [PASS] jasmin-ct accepts poly1305
+  [PASS] jasmin-ct --doit accepts poly1305
+  [PASS] jasmin-ct --sct rejects poly1305 (no SLH protections)
+  [PASS] jasmin-ct --sct accepts the SLH-hardened sct.jazz
+  [PASS] jasminc -arch armv8a rejects sct.jazz (SLH not implemented)
+  [PASS] jasminc -arch x86-64 compiles sct.jazz
+  [PASS] ct_memeq, ct_cswap4, ct_lookup16 (+ leaky versions) vs C: 200000 tests
+  timing: CNTVCT_EL0 at 54.0 MHz, 20000 samples per class
+  [PASS] timing ct_memeq      mean ticks    919.3 vs    907.2  |t| =     0.65  -> no leak detected (expected no leak)
+  [PASS] timing leaky_memeq   mean ticks   1504.8 vs      2.3  |t| =   408.77  -> leak (expected leak)
+  [PASS] timing ct_cswap4     mean ticks     72.2 vs     72.1  |t| =     0.45  -> no leak detected (expected no leak)
+  [PASS] timing leaky_cswap4  mean ticks     24.9 vs     56.2  |t| =    65.25  -> leak (expected leak)
+
+== Stage 6: EasyCrypt: extraction (normal and CT models) and proofs
+   started 23:40:07
+  [PASS] EasyCrypt type-checks Isa.ec (normal model)
+  [PASS] EasyCrypt type-checks Isa_CT.ec (constant-time leakage model)
+  [PASS] EasyCrypt type-checks Stackzero.ec (normal model)
+  [PASS] EasyCrypt type-checks Stackzero_CT.ec (constant-time leakage model)
+  [PASS] EasyCrypt type-checks Chacha20.ec (normal model)
+  [PASS] EasyCrypt type-checks Chacha20_CT.ec (constant-time leakage model)
+  [PASS] EasyCrypt type-checks Poly1305.ec (normal model)
+  [PASS] EasyCrypt type-checks Poly1305_CT.ec (constant-time leakage model)
+  [PASS] EasyCrypt type-checks Ct.ec (normal model)
+  [PASS] EasyCrypt type-checks Ct_CT.ec (constant-time leakage model)
+  [PASS] proofs/isa_correct.ec: add128 and SUBS carry flag correct
+  [PASS] proofs/ct_proofs.ec: 5 constant-time (non-interference) proofs
+  [PASS] fail_leaky_cswap4.ec: CT proof of a leaky function is rejected
+  [PASS] fail_leaky_lookup16.ec: CT proof of a leaky function is rejected
+  [PASS] fail_leaky_memeq.ec: CT proof of a leaky function is rejected
+
+== Stage 7: performance (informational)
+   started 23:42:51
+  [INFO] kernel                                    ns/byte   cycles/B   (C: gcc -O2, 2400 MHz)
+  [INFO] ChaCha20 block  Jasmin (scalar)             2.857       6.86
+  [INFO] ChaCha20 block  C (scalar)                  2.504       6.01
+  [INFO] ChaCha20 64 B   OpenSSL                     2.636       6.33
+  [INFO] ChaCha20 4 KiB  OpenSSL (NEON)              1.001       2.40
+  [INFO] Poly1305 4 KiB  Jasmin (radix 2^26)         2.271       5.45
+  [INFO] Poly1305 4 KiB  C (radix 2^26)              0.905       2.17
+  [INFO] Poly1305 4 KiB  OpenSSL                     0.504       1.21
+
+== Stage 8: expected compilation failures (ARMv8-A back-end limitations)
+   started 23:42:56
+  [PASS] adc_imm           rejected: ADC has no immediate operand form.
+  [PASS] add32_imm         rejected: 32-bit ADD accepts only imm12 (64-bit ADD materialises large constants automatically).
+  [PASS] args9             rejected: Export functions take at most 8 arguments (no stack-passed arguments).
+  [PASS] csel_imm          rejected: Conditional moves take register operands only.
+  [PASS] logic_imm         rejected: Logical operations accept only bitmask immediates.
+  [PASS] mul_imm           rejected: MUL has no immediate operand form.
+  [PASS] mulu32            rejected [internal compiler error]: 32x32->64 multiplication into two registers (mulu_32): internal compiler error.
+  [PASS] mulu64            rejected [internal compiler error]: 64x64->128 multiplication (mulu) is not implemented: internal compiler error (x86-64 compiles it).
+  [PASS] rotl_var          rejected: Rotate left by a register is not available (rotate right by -n instead).
+  [PASS] sbb               rejected: Generic subtract-with-borrow: the borrow flag cannot be allocated (use SUBS + MVN + ADC).
+  [PASS] shift_unmasked    rejected: Variable shifts must be written x << (n & 63).
+  [PASS] slh               rejected: Selective Speculative Load Hardening (init_msf/update_msf/protect) is not implemented on ARMv8-A, although jasmin-ct --sct accepts the program.
+  [PASS] stackzero_loopsct rejected: Stack zeroization strategy loopSCT is not supported on ARMv8-A.
+  [PASS] swap32            rejected [internal compiler error]: #swap on 32-bit registers: internal compiler error (64-bit swap works).
+  [PASS] u8_arith          rejected: There are no 8/16-bit general-purpose registers on AArch64.
+  [PASS] umull             rejected: UMULL / UMADDL exist in the EasyCrypt model (JModel_armv8a.ec) but are not Jasmin intrinsics.
+  [PASS] vector            rejected: No vector (NEON/SIMD) register bank on this target.
+  negative tests: 17 passed, 0 failed
+
+== Summary: 161 passed, 0 failed
+./run-all.sh  388.06s user 9.37s system 94% cpu 7:01.36 total

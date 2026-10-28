@@ -1,0 +1,1095 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[scaled=0.95]{inconsolata}
+\usepackage{microtype}
+% Typewriter text: print "--" as two hyphens (command-line options), not as a dash.
+\DisableLigatures[-]{encoding = *, family = tt*}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage[most]{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------------
+% Text elements are black and white. Color is used only for the syntax
+% highlighting of code, on a transparent background.
+% ---------------------------------------------------------------------------
+\definecolor{kw}{RGB}{0,70,160}       % keywords
+\definecolor{cmt}{RGB}{90,110,90}     % comments
+\definecolor{str}{RGB}{160,60,30}     % strings
+\definecolor{lnum}{gray}{0.55}        % line numbers
+
+% Notes and cautions: a black rule on the left, no fill.
+\newtcolorbox{note}{enhanced,breakable,sharp corners,colback=white,colframe=black,
+  boxrule=0pt,leftrule=0.8pt,left=8pt,right=0pt,top=2pt,bottom=2pt,
+  before upper={\textbf{Note.}\ }}
+\newtcolorbox{warning}{enhanced,breakable,sharp corners,colback=white,colframe=black,
+  boxrule=0pt,leftrule=0.8pt,left=8pt,right=0pt,top=2pt,bottom=2pt,
+  before upper={\textbf{Caution.}\ }}
+
+% ---------------------------------------------------------------------------
+% Listings: transparent background, thin black rules above and below
+% ---------------------------------------------------------------------------
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=lines, framerule=0.4pt, rulecolor=\color{black},
+  breaklines=true, breakatwhitespace=false,
+  postbreak=\mbox{$\hookrightarrow$\space},
+  columns=fullflexible, keepspaces=true,
+  showstringspaces=false,
+  xleftmargin=0pt, xrightmargin=0pt,
+  aboveskip=8pt, belowskip=8pt,
+  captionpos=b,
+  upquote=true,
+}
+
+% Shell sessions: lines that start with "$" are commands; the other lines are output.
+\lstdefinestyle{shell}{
+  language=bash,
+  keywordstyle=\color{kw},
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  morekeywords={sudo,apt-get,opam,eval,jasminc,jasmin2ec,jasmin-ct,gcc,curl,unzip,df,du,npm,rm,make},
+}
+% Program output.
+\lstdefinestyle{output}{
+  language={}, basicstyle=\ttfamily\footnotesize,
+}
+
+\lstdefinelanguage{Jasmin}{
+  morekeywords={fn,export,inline,return,reg,stack,inline,int,bool,u8,u16,u32,u64,
+    u128,u256,for,to,downto,while,if,else,param,global,require,from},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morecomment=[s]{\#[}{]},
+  morestring=[b]",
+}
+\lstdefinestyle{jasmin}{
+  language=Jasmin, keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape, stringstyle=\color{str},
+  numbers=left, numberstyle=\tiny\color{lnum}, numbersep=6pt,
+}
+
+\lstdefinelanguage{EasyCrypt}{
+  morekeywords={require,import,from,lemma,proof,qed,module,proc,var,return,
+    hoare,equiv,phoare,op,type,axiom,theory,end,clone,with,as,if,then,else,
+    forall,exists,fun,by,smt,ring,rnd,skip,wp,rewrite,have,split,first,move,
+    admit,res,true,false},
+  sensitive=true,
+  morecomment=[s]{(*}{*)},
+  morestring=[b]",
+}
+\lstdefinestyle{easycrypt}{
+  language=EasyCrypt, keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape, stringstyle=\color{str},
+  numbers=left, numberstyle=\tiny\color{lnum}, numbersep=6pt,
+}
+\lstdefinestyle{asm}{
+  language=[x86masm]Assembler, morekeywords={adds,adcs,adc,ldr,str,movz,ret},
+  keywordstyle=\color{kw}, commentstyle=\color{cmt},
+}
+\lstdefinestyle{c}{
+  language=C, keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape, stringstyle=\color{str},
+  numbers=left, numberstyle=\tiny\color{lnum}, numbersep=6pt,
+}
+
+\newcommand{\cmd}[1]{\lstinline[style=shell,frame=none]{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small Jasmin and EasyCrypt on the Raspberry Pi 5}
+\rhead{\small\thepage}
+
+\title{\textbf{Installation and Testing of Jasmin and EasyCrypt\\on the Raspberry Pi 5}\\[4pt]
+  \large A reproducible procedure for the formal verification of cryptographic code on AArch64}
+\author{}
+\date{October 21, 2026}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+This guide describes, step by step, how to install the \emph{Jasmin}
+compiler (v2026.09.0) and the \emph{EasyCrypt} proof assistant (r2026.07)
+on a Raspberry Pi~5 (8\,GB RAM, Debian~12 ``Bookworm'', AArch64), and how
+to confirm with four tests, comprising 11 checks, that the toolchain
+works. It is written for readers
+who are familiar with the Linux command line but have not used Jasmin,
+EasyCrypt, OCaml or Coq before; it explains each concept when it first
+appears. Each executed command appears in a listing together with the
+relevant part of its output. The tests demonstrate four capabilities of the
+toolchain:
+(i)~the compilation of a Jasmin program to native ARMv8-A assembly and its
+execution against a C reference implementation;
+(ii)~the verification of constant-time security with \texttt{jasmin-ct};
+(iii)~the checking of EasyCrypt proofs, including a probabilistic
+relational proof; and
+(iv)~the translation of Jasmin code to EasyCrypt with \texttt{jasmin2ec}
+and the proof of its functional correctness. All 11 checks pass.
+The guide also documents four problems that arose during the installation
+(a full SD card, a mislabeled Z3 release file, glibc incompatibilities, and
+an operand restriction of the ARMv8-A back end) and their resolutions.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%===========================================================================
+\section{Introduction}
+%===========================================================================
+
+\subsection{Purpose and audience}
+
+Cryptographic software must be correct for every input and must not reveal
+secrets through side channels such as its execution time. Testing alone
+cannot establish such properties, because it can examine only a small
+fraction of the possible inputs. \emph{Formal verification} establishes them with machine-checked
+mathematical proofs. Jasmin and EasyCrypt are two tools that make this
+approach practical for cryptographic code. This guide installs both tools
+on a Raspberry Pi~5 and demonstrates their use on small examples. It is the
+first of three documents in this repository; the second document tests the
+ARMv8-A back end of the Jasmin compiler, and the third applies both tools to
+a post-quantum key encapsulation mechanism.
+
+The guide assumes familiarity with the Linux command line (shell commands,
+packages, environment variables). It does not assume prior knowledge of the
+programming language OCaml, of the proof assistant Coq, or of Jasmin and
+EasyCrypt. A glossary of the technical terms is provided in
+Appendix~\ref{app:glossary}.
+
+\subsection{The tools}
+
+\textbf{Jasmin} is a programming language and a compiler for cryptographic
+implementations that must be both fast and trustworthy (\emph{high
+assurance}). Jasmin programs are written at the level of assembly: they name
+registers, processor flags and memory accesses explicitly, so that the
+programmer controls the generated machine code. The Jasmin compiler is
+\emph{formally verified}: a proof, checked by the proof assistant Coq,
+establishes that the assembly code that the compiler generates has the same
+behavior as the source program. The Jasmin toolchain also includes checkers
+for \emph{memory safety} (the absence of accesses outside the allocated
+memory) and for
+\emph{constant-time security}. A program is constant-time if secret data
+influence neither its control flow (which branches it takes) nor the memory
+addresses that it accesses; otherwise, an attacker who measures the
+execution time can learn information about the secrets. \emph{Speculative}
+constant-time security extends this property to the speculative execution
+of modern processors (attacks of the Spectre family).
+
+\textbf{EasyCrypt} is an interactive proof assistant for cryptographic
+proofs: the user states a property, and EasyCrypt checks a proof of it
+that the user writes step by step. EasyCrypt reasons about programs written
+in a simple imperative language that may draw random values. It supports
+\emph{Hoare logic}, which relates the states before and after the execution
+of a program, and \emph{probabilistic relational Hoare logic} (pRHL),
+which relates the output distributions of two programs; pRHL is the basis of
+game-based security proofs, in which a real system is shown to be
+indistinguishable from an idealized one. EasyCrypt delegates routine
+arithmetic proof steps to automatic provers, called \emph{SMT solvers}
+(Alt-Ergo, CVC5, Z3), through the intermediate platform \emph{Why3}.
+
+The two tools are designed to work together. The translator
+\texttt{jasmin2ec} converts a Jasmin program into an EasyCrypt module, on
+which functional correctness and security properties can then be proved.
+Because the compiler preserves the semantics of the program, these
+properties also hold for the generated assembly code.
+
+Jasmin v2026.09.0 introduced a \textbf{back end for ARMv8-A (AArch64)},
+the 64-bit architecture of the processor of the Raspberry Pi~5 (a
+Cortex-A76); a back end is the part of a compiler that generates code for
+one particular architecture. Jasmin code can therefore be compiled,
+executed, tested and verified on the same machine. This guide demonstrates each of these steps.
+
+\subsection{Overview of the procedure}
+
+Table~\ref{tab:roadmap} lists the steps of the installation. Most of the
+time is spent compiling software from source; the commands themselves are
+few, and Appendix~\ref{app:commands} collects them in one listing.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}clXr@{}}
+\toprule
+\textbf{Step} & \textbf{Section} & \textbf{Action} & \textbf{Time} \\
+\midrule
+1 & \ref{sec:prep} & Free storage and check memory & a few min \\
+2 & \ref{sec:apt} & Install system packages with \texttt{apt-get} & 2 min \\
+3 & \ref{sec:opam} & Initialize opam and create an OCaml environment (switch) & 12 min \\
+4 & \ref{sec:jasmin} & Install Jasmin with opam & 16 min \\
+5 & \ref{sec:easycrypt} & Install EasyCrypt and the SMT solvers, and configure them & 57 min \\
+6 & \ref{sec:tests} & Run the four tests (11 checks) & 15 s \\
+\bottomrule
+\end{tabularx}
+\caption{Steps of the installation and their duration on the Raspberry Pi~5.}
+\label{tab:roadmap}
+\end{table}
+
+\subsection{Conventions}
+
+In shell listings, a line that begins with \texttt{\$} is a command that the
+user types; the remaining lines are the output of the command, which is
+sometimes abridged. The marker \texttt{...} indicates an omission. A
+comment that begins with \texttt{\#} explains a command and is not part of
+it. The example files are located in the directory \file{examples/} next to
+this document; file paths in this guide are relative to the directory
+\file{install-guide/} unless they begin with \texttt{/} or
+\texttt{\textasciitilde}.
+
+%===========================================================================
+\section{Test platform}
+%===========================================================================
+
+Table~\ref{tab:platform} lists the hardware and software with which every
+command of this guide was executed. Other versions may work, but they have
+not been tested.
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{0.9\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Item} & \textbf{Value} \\
+\midrule
+Board            & Raspberry Pi 5 Model B Rev 1.0, 4 cores (Cortex-A76), 7.9\,GiB RAM \\
+Storage          & 64\,GB microSD card (\file{/dev/mmcblk0p2}, ext4) \\
+Operating system & Debian GNU/Linux 12 (bookworm), Raspberry Pi OS kernel 6.12.93+rpt-rpi-2712, aarch64 \\
+C compiler       & GCC 12.2.0 (Debian 12.2.0-14+deb12u1) \\
+opam / OCaml     & opam 2.1.2 (Debian package), OCaml 4.14.2 (switch \texttt{jasmin-ec}) \\
+Jasmin           & 2026.09.0 (\texttt{jasminc}, \texttt{jasmin2ec}, \texttt{jasmin-ct}, \texttt{jasmin2tex}) \\
+EasyCrypt        & r2026.07 (git tag, pinned in opam) \\
+Why3             & 1.8.2 \\
+SMT solvers      & Alt-Ergo 2.6.0 (opam), CVC5 1.0.3 (apt), Z3 4.8.12 (apt) \\
+\LaTeX           & pdfTeX 3.141592653-2.6-1.40.24 (TeX Live 2022/Debian) \\
+\bottomrule
+\end{tabularx}
+\caption{Hardware and software of the test platform.}
+\label{tab:platform}
+\end{table}
+
+%===========================================================================
+\section{Preparation: storage and memory}
+\label{sec:prep}
+%===========================================================================
+
+A build of EasyCrypt and Jasmin from source requires several gigabytes of
+storage: the final installation occupies 4.0\,GB, and the build process
+needs additional temporary space. The command \texttt{df} reports the free
+storage, and the command \texttt{free} reports the free memory:
+
+\begin{lstlisting}[style=shell]
+$ df -h ~ | tail -1
+/dev/mmcblk0p2   58G   55G  514M 100% /
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           7.9Gi       5.2Gi       323Mi        14Mi       2.9Gi       2.7Gi
+Swap:          2.5Gi       2.5Gi       288Ki
+\end{lstlisting}
+
+On the test platform, the SD card was full (100\,\% used). Storage was
+reclaimed by deleting only caches and other files that their programs
+regenerate on demand: the caches of npm, apt and pip, and superseded
+versions of the VS Code Remote server, which VS Code installs on the
+Raspberry Pi when a remote editing session connects to it. The server
+version in use and the most recently used one were retained. Readers who do
+not use these programs can skip the corresponding commands; the general
+rule is to delete only files that are known to be regenerated.
+
+\begin{lstlisting}[style=shell]
+$ ps aux | grep -o 'servers/Stable-[0-9a-f]*' | sort | uniq -c   # which server is in use?
+     30 servers/Stable-6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1
+$ cd ~/.vscode-server/cli/servers && rm -rf Stable-<unused hashes...>
+$ npm cache clean --force
+$ sudo apt-get clean
+$ rm -rf ~/.cache/pip
+$ df -h / | tail -1
+/dev/mmcblk0p2   58G   47G  8.2G  86% /
+\end{lstlisting}
+
+In the second command, \texttt{<unused hashes...>} stands for the
+directory names of the server versions that the first command does not
+report as in use.
+
+\begin{note}
+Reserve at least \textbf{6--8\,GB} of free storage. The available memory
+(1.6--3\,GB, with other programs running) sufficed for opam's default
+parallelism of 3 build jobs on 4 cores. If the operating system terminates a
+build because memory is exhausted (a message from the \emph{out-of-memory
+killer} in the output of \texttt{dmesg}), rerun \cmd{opam install} with the
+option \cmd{-j 1}, which builds one package at a time.
+\end{note}
+
+%===========================================================================
+\section{System packages}
+\label{sec:apt}
+%===========================================================================
+
+Jasmin and EasyCrypt are installed with opam (Section~\ref{sec:opam}), but
+they require several programs and libraries from the operating system.
+Table~\ref{tab:packages} explains the role of each Debian package; the
+following command installs them all:
+
+\begin{lstlisting}[style=shell]
+$ sudo apt-get update
+$ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    opam build-essential m4 pkg-config unzip bubblewrap \
+    libgmp-dev libpcre3-dev zlib1g-dev libmpfr-dev libppl-dev autoconf \
+    z3 cvc5
+$ opam --version
+2.1.2
+$ z3 --version
+Z3 version 4.8.12 - 64 bit
+$ cvc5 --version | head -1
+This is cvc5 version 1.0.3
+\end{lstlisting}
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Package} & \textbf{Role} \\
+\midrule
+\texttt{opam} & package manager for OCaml software, through which Jasmin and EasyCrypt are installed \\
+\texttt{build-essential}, \texttt{m4}, \texttt{pkg-config}, \texttt{autoconf}, \texttt{unzip} & C compiler, linker and build tools needed to compile packages from source \\
+\texttt{bubblewrap} & sandboxing tool that opam uses by default (disabled in Section~\ref{sec:opam}) \\
+\texttt{libgmp-dev}, \texttt{libmpfr-dev}, \texttt{libppl-dev} & arbitrary-precision arithmetic and polyhedra libraries, required by Apron, the abstract-interpretation library of Jasmin's safety checker \\
+\texttt{libpcre3-dev}, \texttt{zlib1g-dev} & regular-expression and compression libraries, installed as a precaution; none of the opam packages of this guide requires them, so they may be omitted \\
+\texttt{z3}, \texttt{cvc5} & two SMT solvers that EasyCrypt can call \\
+\bottomrule
+\end{tabularx}
+\caption{Debian packages and their roles.}
+\label{tab:packages}
+\end{table}
+
+\begin{warning}
+The EasyCrypt documentation recommends Z3 4.12.x. The official release file
+\texttt{z3-4.12.4-arm64-glibc-2.35.zip}, however, contains an \emph{x86-64}
+program instead of an arm64 program, so that its execution fails:
+\begin{lstlisting}[style=output]
+x86_64-binfmt-P: Could not open '/lib64/ld-linux-x86-64.so.2': No such file or directory
+\end{lstlisting}
+All later arm64 releases for Linux (4.15.x--5.3.x) require version 2.38 of
+the C library glibc, whereas Bookworm provides version 2.36. This
+installation therefore retains Debian's Z3 4.8.12 and uses Alt-Ergo 2.6.0,
+the version that EasyCrypt recommends, as the principal prover. All tests in
+this guide pass with this configuration. The opam package \texttt{z3} can be
+built from source instead, but the build takes a long time on the
+Raspberry Pi.
+\end{warning}
+
+%===========================================================================
+\section{opam and the OCaml switch}
+\label{sec:opam}
+%===========================================================================
+
+Jasmin and EasyCrypt are written in OCaml and are distributed through
+\emph{opam}, the package manager of the OCaml ecosystem. opam installs
+packages into a \emph{switch}: an independent directory under
+\file{\textasciitilde/.opam} with its own OCaml compiler and its own set of
+packages. Separate switches allow incompatible versions of software to
+coexist; the third document of this repository, for example, uses a second
+switch for a development version of Jasmin.
+
+This installation uses a dedicated switch named \texttt{jasmin-ec} with
+OCaml 4.14.2. The first command initializes opam: the option \cmd{--bare}
+prevents opam from creating a default switch, and the option
+\cmd{--disable-sandboxing} prevents failures of \texttt{bubblewrap} in
+containers and remote sessions. The second command creates the switch and
+compiles the OCaml compiler from source. The third command activates the
+switch in the current shell, by setting environment variables such as
+\texttt{PATH}.
+
+\begin{lstlisting}[style=shell]
+$ opam init -y --bare --disable-sandboxing
+...
+[WARNING] Shell not updated in non-interactive mode: use --shell-setup
+$ opam switch create jasmin-ec ocaml-base-compiler.4.14.2 -y
+...
+-> installed ocaml-base-compiler.4.14.2
+-> installed ocaml-config.2
+-> installed ocaml.4.14.2
+Done.
+$ eval $(opam env --switch=jasmin-ec)
+$ ocaml -version
+The OCaml toplevel, version 4.14.2
+\end{lstlisting}
+
+The compilation of OCaml took about 12 minutes on the Raspberry Pi~5. The
+activation applies only to the current shell. To activate the switch in
+every new shell, add the \texttt{eval} line to \file{\textasciitilde/.zshrc}
+or \file{\textasciitilde/.bashrc}, or run \cmd{opam init --shell-setup}
+once. All commands in the remainder of this guide assume an active switch.
+
+%===========================================================================
+\section{Installation of Jasmin}
+\label{sec:jasmin}
+%===========================================================================
+
+\subsection{Selection of versions}
+
+The Jasmin toolchain translates programs into EasyCrypt code
+(Section~\ref{sec:test4}), and each Jasmin release generates code for one specific EasyCrypt release;
+the two versions must therefore be selected together. The following commands
+retrieve the latest releases from GitHub and the compatibility statement in
+Jasmin's change log (\file{CHANGELOG.md}):
+
+\begin{lstlisting}[style=shell]
+$ curl -s 'https://api.github.com/repos/jasmin-lang/jasmin/releases?per_page=1' | grep tag_name
+    "tag_name": "v2026.09.0",
+$ curl -s 'https://api.github.com/repos/EasyCrypt/easycrypt/releases?per_page=1' | grep tag_name
+    "tag_name": "r2026.10",
+$ curl -s https://raw.githubusercontent.com/jasmin-lang/jasmin/v2026.09.0/CHANGELOG.md \
+    | grep -n 'targets version' | head -1
+42:- Extraction as EasyCrypt code targets version 2026.07
+\end{lstlisting}
+
+The latest EasyCrypt release (r2026.10) is thus newer than the release that
+Jasmin 2026.09.0 supports (r2026.07). Table~\ref{tab:versions} records the
+selection.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Tool} & \textbf{Latest release} & \textbf{Installed} & \textbf{Reason} \\
+\midrule
+Jasmin    & v2026.09.0 & 2026.09.0 & first release with the ARMv8-A target \\
+EasyCrypt & r2026.10   & r2026.07  & version targeted by Jasmin 2026.09.0 \\
+\bottomrule
+\end{tabular}
+\caption{Selected versions.}
+\label{tab:versions}
+\end{table}
+
+\subsection{Installation with opam}
+
+The first command lists the versions of Jasmin that opam offers; the second
+installs version 2026.09.0 and measures the duration with \texttt{time}:
+
+\begin{lstlisting}[style=shell]
+$ opam show jasmin --field=all-versions
+2022.04.0  2022.09.0 ... 2026.03.2  2026.09.0
+$ time opam install -y jasmin.2026.09.0
+...
+-> installed apron.v0.9.15
+-> installed jasmin.2026.09.0
+Done.
+<><> conf-gmp-paths.1 installed successfully <><><><><><><><><><><><><><><><><>
+=> header file found in /usr/include/aarch64-linux-gnu
+=> library file found in /usr/lib/aarch64-linux-gnu
+opam install -y jasmin.2026.09.0  755.07s user 96.10s system 87% cpu 16:14.07 total
+\end{lstlisting}
+
+The Coq proof of the compiler is not checked during this installation: the
+opam package contains the OCaml code that was extracted from the Coq
+development, so the installation does not require Coq. The build took
+16~minutes.
+
+\subsection{Verification of the installation}
+
+The package installs four programs, which Table~\ref{tab:jasmintools}
+describes. The following commands confirm that they are available and that
+the compiler supports the ARMv8-A target (\texttt{armv8a}):
+
+\begin{lstlisting}[style=shell]
+$ which jasminc jasmin2ec jasmin-ct jasmin2tex
+/home/code-j/.opam/jasmin-ec/bin/jasminc
+/home/code-j/.opam/jasmin-ec/bin/jasmin2ec
+/home/code-j/.opam/jasmin-ec/bin/jasmin-ct
+/home/code-j/.opam/jasmin-ec/bin/jasmin2tex
+$ jasminc -version
+Jasmin Compiler 2026.09.0
+$ jasminc -help | grep -A1 -- '-arch'
+  -arch {x86-64|arm-m4|armv8a|riscv}
+                             Select target arch (default is x86-64)
+\end{lstlisting}
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Program} & \textbf{Function} \\
+\midrule
+\texttt{jasminc} & compiler: translates a Jasmin program (\texttt{.jazz}) into assembly for the selected target \\
+\texttt{jasmin-ct} & constant-time checker: verifies that secret data influence neither branches nor memory addresses \\
+\texttt{jasmin2ec} & translator: converts a Jasmin program into an EasyCrypt module \\
+\texttt{jasmin2tex} & pretty-printer: typesets a Jasmin program in \LaTeX{} (not used in this guide) \\
+\bottomrule
+\end{tabularx}
+\caption{Programs of the Jasmin package.}
+\label{tab:jasmintools}
+\end{table}
+
+The package also installs Jasmin's EasyCrypt support library, called
+\emph{eclib} (\file{JModel\_armv8a.ec}, \file{JWord.ec}, \dots), in the
+directory \file{\$OPAM\_SWITCH\_PREFIX/lib/easycrypt/jasmin}. This library
+defines, in EasyCrypt, the machine words and the instructions that the
+translated programs use. EasyCrypt locates it automatically
+(Section~\ref{sec:ec-config}).
+
+%===========================================================================
+\section{Installation of EasyCrypt}
+\label{sec:easycrypt}
+%===========================================================================
+
+\subsection{Installation with opam}
+
+The default opam repository does not provide EasyCrypt at the required
+version. The command \texttt{opam pin} therefore associates the package name
+\texttt{easycrypt} with a specific source, the git tag \texttt{r2026.07} of
+the EasyCrypt repository; the subsequent \texttt{opam install} builds the
+package from this source, together with the SMT solver Alt-Ergo~2.6.0:
+
+\begin{lstlisting}[style=shell]
+$ opam pin add -yn easycrypt https://github.com/EasyCrypt/easycrypt.git#r2026.07
+[easycrypt.~dev] synchronised (git+https://github.com/EasyCrypt/easycrypt.git#r2026.07)
+easycrypt is now pinned to git+https://github.com/EasyCrypt/easycrypt.git#r2026.07 (version ~dev)
+$ time opam install -y easycrypt alt-ergo.2.6.0
+...
+$ opam list --installed easycrypt why3 alt-ergo bitwuzla-cxx
+# Name       # Installed # Synopsis
+alt-ergo     2.6.0       The Alt-Ergo SMT prover
+bitwuzla-cxx 0.9.1       SMT solver for AUFBVFP (C++ API)
+easycrypt    ~dev        pinned to version ~dev at git+https://github.com/EasyCrypt/easycrypt.git#r2026.07
+why3         1.8.2       Why3 environment for deductive program verification
+\end{lstlisting}
+
+This step took about \textbf{57 minutes}. Most of the time was spent on the
+C++ build of the SMT solver Bitwuzla (\texttt{bitwuzla-cxx}), on Why3 and
+Alt-Ergo, and on a rebuild of Jasmin: the dependencies of EasyCrypt require
+version 1.3.0 of the OCaml library \texttt{cmdliner} instead of version
+2.1.1, so opam recompiled every installed package that depends on
+\texttt{cmdliner}, including Jasmin.
+
+\begin{note}
+The terminal session was disconnected during this step. The
+\texttt{opam install} process continued in the background and completed
+normally. In such a case, check with \cmd{pgrep -af opam} whether an opam
+process is still running before starting another installation in the same
+switch: opam locks the switch while it works, and a second
+\texttt{opam install} waits until the lock is released.
+\end{note}
+
+\subsection{Configuration of the SMT solvers}
+\label{sec:ec-config}
+
+EasyCrypt calls the SMT solvers through Why3, which must know where each
+solver is installed. The command \texttt{easycrypt why3config} searches for
+the installed solvers and writes this information to a configuration file;
+it must be rerun after every installation or update of a solver. The command
+\texttt{easycrypt config} then displays the resulting configuration:
+
+\begin{lstlisting}[style=shell]
+$ easycrypt why3config
+...
+Found prover Z3 version 4.8.12, OK.
+Found prover Z3 version 4.8.12 (alternative: noBV)
+10 prover(s) added
+Save config to /home/code-j/.config/easycrypt/why3.conf
+$ easycrypt config
+git-hash: r2026.07
+load-path:
+  Jasmin@/home/code-j/.opam/jasmin-ec/lib/easycrypt/jasmin
+  <system>@/home/code-j/.opam/jasmin-ec/lib/easycrypt/theories
+  ...
+why3 configuration file
+  /home/code-j/.config/easycrypt/why3.conf
+...
+known provers: Alt-Ergo@2.6.0, Alt-Ergo[BV]@2.6.0, Alt-Ergo[counterexamples]@2.6.0,
+  CVC5@1.0.3, CVC5[counterexamples]@1.0.3, CVC5[strings]@1.0.3,
+  CVC5[strings+counterexamples]@1.0.3, Z3@4.8.12, Z3[counterexamples]@4.8.12, Z3[noBV]@4.8.12
+\end{lstlisting}
+
+Two entries of this output are relevant. The entry \texttt{known provers}
+lists the solvers that EasyCrypt can invoke; several solvers appear more than
+once, in different configurations. The entry \texttt{Jasmin@\dots} of the
+load path shows that the Jasmin eclib is registered under the logical name
+\texttt{Jasmin}; the EasyCrypt statement
+\lstinline[style=easycrypt,numbers=none,frame=none]|from Jasmin require import JModel_armv8a.|
+therefore finds the library without additional options.
+
+%===========================================================================
+\section{Tests}
+\label{sec:tests}
+%===========================================================================
+
+The tests confirm that each component of the toolchain works, and they
+introduce the basic use of each tool. Table~\ref{tab:tests} summarizes what
+each test demonstrates. The test files are located in \file{examples/}, and
+a single script runs all tests (Section~\ref{sec:script}). The directory
+has the following structure:
+
+\begin{lstlisting}[style=output]
+examples/
+|-- run-tests.sh              # runs all 11 checks
+|-- run-tests-output.txt      # output of the last run
+|-- jasmin/
+|   |-- add256.jazz           # 256-bit addition (ARMv8-A)
+|   |-- test_add256.c         # C harness, 10^6 random tests
+|   `-- ct_select.jazz        # constant-time and leaky selection
+`-- easycrypt/
+    |-- hello.ec              # SMT smoke test
+    |-- otp.ec                # one-time pad, pRHL proof
+    |-- wrong.ec              # negative test: must fail
+    |-- CtSelect.ec           # generated by jasmin2ec
+    `-- ct_select_proof.ec    # correctness proof of the Jasmin code
+\end{lstlisting}
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\textbf{Test} & \textbf{What the test demonstrates} & \textbf{Tools} \\
+\midrule
+1 & Jasmin code compiles to ARMv8-A assembly that runs on the Raspberry Pi and computes correct results & \texttt{jasminc}, \texttt{gcc} \\
+2 & The constant-time checker accepts code without secret-dependent branches and rejects code with such a branch & \texttt{jasmin-ct} \\
+3 & EasyCrypt accepts correct proofs, including a probabilistic one, and rejects an attempted proof of a false statement & \texttt{easycrypt} \\
+4 & A Jasmin function, translated to EasyCrypt, can be proved functionally correct & \texttt{jasmin2ec}, \texttt{easycrypt} \\
+\bottomrule
+\end{tabularx}
+\caption{Overview of the tests. The test script (Section~\ref{sec:script}) divides these four tests into 11 checks.}
+\label{tab:tests}
+\end{table}
+
+%---------------------------------------------------------------------------
+\subsection{Test 1: compilation of Jasmin to ARMv8-A and native execution}
+%---------------------------------------------------------------------------
+
+The Jasmin program of the first test adds two 256-bit integers. A 64-bit processor cannot
+add such numbers in one instruction, so each number is represented by four
+64-bit words, called \emph{limbs}, and the limbs are added from the least to
+the most significant one. Each addition sets the processor's \emph{carry
+flag} when its result exceeds 64 bits, and the next addition adds this
+carry. Multi-precision addition of this kind is a basic building block of
+elliptic-curve and other public-key arithmetic. The program manipulates the
+carry flag explicitly, through the Boolean variable \texttt{cf}. The
+\texttt{for} loop assigns the values 1, 2 and 3 to the compile-time variable
+\texttt{i} of type \texttt{inline int} (the upper bound 4 is excluded), and
+the compiler unrolls the loop completely.
+
+\lstinputlisting[style=jasmin,caption={\file{examples/jasmin/add256.jazz}}]{examples/jasmin/add256.jazz}
+
+The compiler translates the program into an assembly file for the ARMv8-A
+target:
+
+\begin{lstlisting}[style=shell]
+$ cd examples/jasmin
+$ jasminc -arch armv8a -o add256.s add256.jazz
+$ cat add256.s
+\end{lstlisting}
+
+\begin{lstlisting}[style=asm,caption={AArch64 assembly generated by \texttt{jasminc} (\file{add256.s})}]
+	.global	add256
+	.p2align	2
+	.type	add256, %function
+add256:
+	str 	x30, [sp, #-16]!
+	ldr 	x3, [x1]
+	ldr 	x4, [x2]
+	adds	x3, x3, x4
+	str 	x3, [x0]
+	ldr 	x3, [x1, #8]
+	ldr 	x4, [x2, #8]
+	adcs	x3, x3, x4
+	str 	x3, [x0, #8]
+	ldr 	x3, [x1, #16]
+	ldr 	x4, [x2, #16]
+	adcs	x3, x3, x4
+	str 	x3, [x0, #16]
+	ldr 	x3, [x1, #24]
+	ldr 	x4, [x2, #24]
+	adcs	x3, x3, x4
+	str 	x3, [x0, #24]
+	movz	x0, #0
+	movz	x1, #0
+	adc 	x0, x1, x0
+	ldr 	x30, [sp], #16
+	ret
+	.ident	"Jasmin Compiler 2026.09.0"
+	.section	".note.GNU-stack", "", %progbits
+\end{lstlisting}
+
+The generated code follows AAPCS64, the procedure call standard of AArch64,
+which defines how a function receives its arguments and returns its result:
+the three pointer arguments arrive in the registers
+\texttt{x0}--\texttt{x2}, and the final carry is returned in \texttt{x0}.
+A C program can therefore call the function directly. The carry chain
+compiles to one \texttt{adds} instruction (addition that sets the carry
+flag) followed by \texttt{adcs} instructions (addition with carry). A C test
+program compares the result with a portable reference implementation, which
+computes with the 128-bit C type \texttt{unsigned \_\_int128}, on $10^6$
+random inputs. Every seventh input is constructed so that the carry
+propagates through all four limbs:
+
+\lstinputlisting[style=c,caption={\file{examples/jasmin/test\_add256.c}}]{examples/jasmin/test_add256.c}
+
+The C compiler links the C test program with the generated assembly file:
+
+\begin{lstlisting}[style=shell]
+$ gcc -O2 -Wall -o test_add256 test_add256.c add256.s
+$ ./test_add256
+add256: 1000000 random tests passed
+\end{lstlisting}
+
+The same source file also compiles for the other targets of Jasmin, for
+example x86-64. In this case \texttt{jasminc} acts as a cross-compiler: it
+generates code for a processor other than the one on which it runs, and the
+Raspberry Pi cannot execute the result:
+
+\begin{lstlisting}[style=shell]
+$ jasminc -arch x86-64 -o add256_x86.s add256.jazz
+\end{lstlisting}
+
+\begin{warning}
+The first version of the program ended with the statement
+\lstinline[style=jasmin,numbers=none,frame=none]|_, carry += 0 + cf;|,
+which the compiler rejected:
+\begin{lstlisting}[style=output]
+"add256.jazz", line 21 (2-21):
+compilation error in function add256:
+asmgen: instruction ADC_64 is given incompatible args.
+Allowed args are:
+  [[reg]; [reg]; [reg]]
+\end{lstlisting}
+The AArch64 instruction \texttt{ADC} accepts only registers as operands, not
+a constant (an \emph{immediate}). Jasmin reports this restriction instead of
+inserting the necessary register moves implicitly, because each Jasmin
+instruction corresponds to exactly one machine instruction. The correction
+places the constant in a register
+(\lstinline[style=jasmin,numbers=none,frame=none]|zero = 0;|) and uses the
+statement \lstinline[style=jasmin,numbers=none,frame=none]|_, carry += zero + cf;|.
+\end{warning}
+
+%---------------------------------------------------------------------------
+\subsection{Test 2: constant-time verification with \texttt{jasmin-ct}}
+%---------------------------------------------------------------------------
+
+A conditional selection returns one of two values depending on a condition
+bit. If the condition bit is secret and the selection is implemented with a
+branch, the execution time and the memory accesses can depend on the
+secret. The checker \texttt{jasmin-ct} verifies that secret data influence
+neither the control flow nor the memory addresses of a program. For this
+purpose, the annotation \texttt{\#[ct = "..."]} declares the \emph{security
+type} of each argument and of the result: \texttt{public} (known to an
+attacker) or \texttt{secret}. The test file defines two functions that
+compute the same result: a branch-free selection, which combines the two values with a
+mask computed from the condition bit, and a leaky selection, which branches
+on the secret bit:
+
+\lstinputlisting[style=jasmin,caption={\file{examples/jasmin/ct\_select.jazz}}]{examples/jasmin/ct_select.jazz}
+
+The option \texttt{--slice} restricts the check to one function. The first
+command checks only \texttt{ct\_select}; the second checks the whole file:
+
+\begin{lstlisting}[style=shell]
+$ jasmin-ct --arch=armv8a --slice=ct_select ct_select.jazz; echo "exit=$?"
+exit=0
+$ jasmin-ct --arch=armv8a ct_select.jazz; echo "exit=$?"
+
+"ct_select.jazz", line 22 (6-7):
+constant type checker: c has type secret it needs to be public
+exit=1
+\end{lstlisting}
+
+The checker accepts \texttt{ct\_select} (exit code 0) and rejects
+\texttt{leaky\_select} (exit code 1); its error message identifies the
+offending condition \texttt{c == 1} in line 22. The option
+\cmd{--speculative} additionally verifies speculative constant time
+(Spectre v1).
+
+%---------------------------------------------------------------------------
+\subsection{Test 3: EasyCrypt proofs}
+%---------------------------------------------------------------------------
+
+An EasyCrypt file states \emph{lemmas}, each followed by a proof between the
+keywords \texttt{proof} and \texttt{qed}. A proof consists of
+\emph{tactics}, commands that transform the statement to be proved (the
+\emph{goal}) into simpler goals until none remains. EasyCrypt rejects the
+file if any goal remains open. This test checks three files.
+
+\paragraph{SMT smoke test.} The first file verifies that the standard
+library loads, that the tactic \texttt{smt()} can delegate goals to the SMT
+solvers through Why3, and that the tactic \texttt{ring}, which proves
+algebraic identities, is available:
+
+\lstinputlisting[style=easycrypt,caption={\file{examples/easycrypt/hello.ec}}]{examples/easycrypt/hello.ec}
+
+\paragraph{Probabilistic relational proof.} The one-time pad encrypts a
+message bit \(m\) as \(m \oplus k\) with a uniformly random key bit \(k\).
+It is perfectly secret: the ciphertext has the same distribution as a fresh
+uniform bit, whatever the message. The file states this property in pRHL as
+an equivalence (\texttt{equiv}) between two procedures, the real encryption
+\texttt{OTP.enc} and an ideal procedure \texttt{Ideal.enc} that returns a
+random bit. The postcondition \texttt{=\{res\}} requires that the results of
+the two procedures be equal when their random choices are suitably paired;
+such a pairing, called a \emph{coupling}, implies that the two results have
+the same distribution. The tactic \texttt{rnd} establishes the coupling: it
+pairs each key \(k\) of the real procedure with the value \(m \oplus k\) of
+the ideal procedure. Because this pairing is a bijection between the two
+sets of random choices, it preserves probabilities, and the two results
+coincide:
+
+\lstinputlisting[style=easycrypt,caption={\file{examples/easycrypt/otp.ec}}]{examples/easycrypt/otp.ec}
+
+\paragraph{Negative test.} A proof checker is useful only if it rejects
+false statements. The following file states a false lemma ($x + 1 = x$),
+which EasyCrypt must reject:
+
+\lstinputlisting[style=easycrypt,caption={\file{examples/easycrypt/wrong.ec}}]{examples/easycrypt/wrong.ec}
+
+The command \texttt{easycrypt compile} checks a file and reports success
+with exit code 0:
+
+\begin{lstlisting}[style=shell]
+$ cd examples/easycrypt
+$ easycrypt compile -no-eco hello.ec; echo "exit=$?"
+exit=0
+$ easycrypt compile -no-eco otp.ec; echo "exit=$?"
+exit=0
+$ easycrypt compile -no-eco wrong.ec; echo "exit=$?"
+[critical] [wrong.ec: line 5 (7-16)] cannot prove goal (strict)
+exit=1
+\end{lstlisting}
+
+The option \texttt{-no-eco} disables the cache of previously checked
+theories (\texttt{.eco} files) and thereby forces a complete check. On the
+Raspberry Pi~5, the checks took 1.2\,s (\file{hello.ec}) and 2.6\,s
+(\file{otp.ec}).
+
+\begin{note}
+\textbf{Inspection of proof goals without an editor.} When a tactic fails,
+\texttt{easycrypt compile} reports only the error. To display the goal that
+remains at a given line, pass the file up to that line to the command-line
+interface of EasyCrypt:
+\begin{lstlisting}[style=shell]
+$ sed -n '1,12p' ct_select_proof.ec | easycrypt cli -emacs
+...
+Current goal (remaining: 2)
+------------------------------------------------------------------------
+a0 `&` - one `|` b0 `&` invw (- one) = a0
+\end{lstlisting}
+For regular proof development, an interactive editor is more convenient:
+Proof General (Emacs) or the EasyCrypt extension for VS Code.
+\end{note}
+
+%---------------------------------------------------------------------------
+\subsection{Test 4: translation from Jasmin to EasyCrypt and correctness proof}
+\label{sec:test4}
+%---------------------------------------------------------------------------
+
+This test combines the two tools. The translator \texttt{jasmin2ec}
+converts the constant-time function \texttt{ct\_select} of Test~2 into an
+EasyCrypt module (\texttt{M}) with one procedure per translated function. The option
+\texttt{--arch=armv8a} selects the eclib model of the ARMv8-A instructions,
+and the option \texttt{-f} selects the function to translate:
+
+\begin{lstlisting}[style=shell]
+$ cd examples/jasmin
+$ jasmin2ec --arch=armv8a -f ct_select -o ../easycrypt/CtSelect.ec ct_select.jazz
+\end{lstlisting}
+
+\lstinputlisting[style=easycrypt,caption={\file{examples/easycrypt/CtSelect.ec} (generated)}]{examples/easycrypt/CtSelect.ec}
+
+A proof in Hoare logic then establishes that the branch-free code computes a
+selection. The statement \texttt{hoare [ M.ct\_select : P ==> Q ]} asserts
+that every execution of the procedure that starts in a state satisfying the
+precondition \texttt{P} ends in a state satisfying the postcondition
+\texttt{Q}. Here, the precondition requires \(c \in \{0, 1\}\), and the
+postcondition requires that the result \texttt{res} equals \(a\) if
+\(c = 1\) and \(b\) if \(c = 0\). The proof treats the two cases separately
+and relies on the bit-level properties of the mask \(0 - c\), which consists
+of either all ones or all zeros, using lemmas of \file{JWord.ec}:
+
+\lstinputlisting[style=easycrypt,caption={\file{examples/easycrypt/ct\_select\_proof.ec}}]{examples/easycrypt/ct_select_proof.ec}
+
+\begin{lstlisting}[style=shell]
+$ cd ../easycrypt
+$ easycrypt compile -no-eco ct_select_proof.ec; echo "exit=$?"
+exit=0
+\end{lstlisting}
+
+The proof is checked in 6.5\,s on the Raspberry Pi~5; most of this time is
+spent loading the Jasmin eclib. Together with Test~2, this result
+establishes that \texttt{ct\_select} is constant-time (\texttt{jasmin-ct})
+\emph{and} functionally correct (EasyCrypt). Because the Jasmin compiler is
+verified, both properties also hold for the generated AArch64 code.
+
+%---------------------------------------------------------------------------
+\subsection{Execution of all tests}
+\label{sec:script}
+%---------------------------------------------------------------------------
+
+The script \file{examples/run-tests.sh} rebuilds and checks all examples. It
+performs 11 checks, which divide the four tests above into their individual
+steps. For the two negative checks (the leaky selection and the false
+lemma), the script verifies that the tool fails as intended, with exit
+code~1:
+
+\lstinputlisting[style=shell,caption={\file{examples/run-tests.sh}}]{examples/run-tests.sh}
+
+\begin{lstlisting}[style=shell]
+$ cd examples
+$ time ./run-tests.sh | tee run-tests-output.txt
+\end{lstlisting}
+
+\lstinputlisting[style=output,caption={Output of \file{run-tests.sh} on the Raspberry Pi 5}]{examples/run-tests-output.txt}
+
+The complete test suite runs in about 15\,s. Each line marked
+\texttt{[PASS]} corresponds to one check; a failed check is marked
+\texttt{[FAIL]} and makes the script exit with a nonzero code.
+
+%===========================================================================
+\section{Summary}
+%===========================================================================
+
+Table~\ref{tab:summary} summarizes the time and storage that the
+installation required.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lrX@{}}
+\toprule
+\textbf{Step} & \textbf{Wall-clock time} & \textbf{Remarks} \\
+\midrule
+apt packages                          & $\approx$ 2 min  & opam, build tools, Z3, CVC5 \\
+\texttt{opam init} and OCaml 4.14.2 switch & $\approx$ 12 min & compiler built from source \\
+Jasmin 2026.09.0                      & 16 min          & including Apron, PPL bindings, Menhir \\
+EasyCrypt r2026.07 and Alt-Ergo 2.6.0 & $\approx$ 57 min & including Bitwuzla (C++), Why3, rebuild of Jasmin \\
+Test suite (4 tests, 11 checks)       & 15 s            & all checks pass \\
+\midrule
+Storage used by \file{\textasciitilde/.opam} & 4.0 GB  & switch \texttt{jasmin-ec}: 3.9 GB \\
+\bottomrule
+\end{tabularx}
+\caption{Time and storage requirements on the Raspberry Pi 5 (8\,GB RAM, microSD storage).}
+\label{tab:summary}
+\end{table}
+
+\paragraph{Recommendations.}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Select matching versions.} Install the EasyCrypt release
+        that Jasmin's \file{CHANGELOG.md} names (``Extraction as EasyCrypt
+        code targets version \dots''), not the latest EasyCrypt release.
+  \item \textbf{Reclaim storage before the build.} A margin of 6--8\,GB is
+        sufficient. On a full disk, builds fail with misleading error
+        messages.
+  \item \textbf{Verify prover binaries for arm64.} The upstream Z3 builds
+        for arm64 are either mislabeled (4.12.4) or require
+        glibc~$\geq$~2.38. On Bookworm, use Debian's Z3 together with
+        Alt-Ergo from opam.
+  \item \textbf{Observe the ARMv8-A operand rules.} Instructions such as
+        \texttt{ADC} accept only register operands; when a program violates
+        such a rule, \texttt{jasminc} reports the permitted operand forms.
+  \item \textbf{Run long builds in a persistent session.} The \texttt{opam}
+        process continues after a disconnection, but a terminal multiplexer
+        such as \texttt{tmux} or \texttt{screen} keeps its output visible
+        and allows reconnecting to it.
+\end{itemize}
+
+The second document of this repository (\file{../armv8-tests}) builds on
+this installation: it tests the ARMv8-A back end of Jasmin systematically on
+the Raspberry Pi~5.
+
+%===========================================================================
+\appendix
+\section{Complete command sequence}
+\label{app:commands}
+%===========================================================================
+
+\begin{lstlisting}[style=shell]
+# 1. System packages
+$ sudo apt-get update
+$ sudo apt-get install -y opam build-essential m4 pkg-config unzip bubblewrap \
+    libgmp-dev libpcre3-dev zlib1g-dev libmpfr-dev libppl-dev autoconf z3 cvc5
+
+# 2. opam and OCaml
+$ opam init -y --bare --disable-sandboxing
+$ opam switch create jasmin-ec ocaml-base-compiler.4.14.2 -y
+$ eval $(opam env --switch=jasmin-ec)
+
+# 3. Jasmin
+$ opam install -y jasmin.2026.09.0
+
+# 4. EasyCrypt and Alt-Ergo
+$ opam pin add -yn easycrypt https://github.com/EasyCrypt/easycrypt.git#r2026.07
+$ opam install -y easycrypt alt-ergo.2.6.0
+$ easycrypt why3config
+$ easycrypt config
+
+# 5. Tests
+$ cd install-guide/examples && ./run-tests.sh
+\end{lstlisting}
+
+%===========================================================================
+\section{Glossary}
+\label{app:glossary}
+%===========================================================================
+
+\begin{small}
+\begin{description}[leftmargin=0pt,itemsep=2pt]
+  \item[AAPCS64] Procedure Call Standard for the Arm 64-bit Architecture: the
+        rules by which functions pass arguments, return results and preserve
+        registers.
+  \item[AArch64, ARMv8-A] The 64-bit execution state and the version of the
+        Arm architecture that the Cortex-A76 of the Raspberry Pi~5
+        implements; used interchangeably in this guide.
+  \item[Back end] The part of a compiler that generates code for one
+        particular processor architecture (target).
+  \item[Carry flag] A processor flag that records whether the last addition
+        produced a result too large for its register.
+  \item[Constant time] The property that secret data influence neither the
+        control flow nor the memory addresses of a program, so that its
+        execution time reveals nothing about the secrets.
+  \item[Coq] A proof assistant in which the correctness of the Jasmin
+        compiler is proved.
+  \item[Coupling] In pRHL: a pairing of the random choices of two programs
+        that preserves their probabilities.
+  \item[Cross-compiler] A compiler that generates code for a processor
+        other than the one on which it runs.
+  \item[eclib] The EasyCrypt library of Jasmin, which models machine words
+        and instructions for programs translated by \texttt{jasmin2ec}.
+  \item[Formal verification] The establishment of properties of a program by
+        machine-checked mathematical proof, for all inputs.
+  \item[Hoare logic] A logic for statements of the form ``if the precondition
+        holds before the execution, the postcondition holds after it''.
+  \item[Immediate] A constant operand that is encoded directly in an
+        instruction.
+  \item[Lemma, tactic, goal] In EasyCrypt: a stated property, a proof step,
+        and a statement that remains to be proved.
+  \item[Limb] One machine word of a multi-word integer.
+  \item[opam, switch, pin] The OCaml package manager; an independent
+        installation of an OCaml compiler with its packages; the association
+        of a package name with a specific source.
+  \item[pRHL] Probabilistic relational Hoare logic: a logic that relates the
+        output distributions of two probabilistic programs.
+  \item[Security type] In \texttt{jasmin-ct}: the annotation of a value as
+        \texttt{public} or \texttt{secret}.
+  \item[SMT solver] An automatic prover for logical formulas over arithmetic
+        and other theories (here Alt-Ergo, CVC5 and Z3).
+  \item[Why3] A platform through which EasyCrypt calls the SMT solvers.
+\end{description}
+\end{small}
+
+%===========================================================================
+\section{References}
+%===========================================================================
+
+\begin{itemize}[leftmargin=*]
+  \item Jasmin: \url{https://github.com/jasmin-lang/jasmin}
+  \item Jasmin documentation: \url{https://jasmin-lang.readthedocs.io}
+  \item EasyCrypt: \url{https://github.com/EasyCrypt/easycrypt}
+  \item Formosa-Crypto Zulip chat (user community of Jasmin and EasyCrypt):\\
+        \url{https://formosa-crypto.zulipchat.com}
+\end{itemize}
+
+\end{document}

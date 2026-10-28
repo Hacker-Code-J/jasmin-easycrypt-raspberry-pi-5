@@ -1,0 +1,3 @@
+// Selective Speculative Load Hardening (init_msf/update_msf/protect) is not implemented on ARMv8-A, although jasmin-ct --sct accepts the program.
+// EXPECT: does not provides protection for selective speculative load hardening
+export fn f(reg u64 p) -> reg u64 { reg u64 msf v; msf = #init_msf(); v = [p]; v = #protect(v, msf); return v; }

@@ -1,0 +1,124 @@
+// Poly1305 one-time authenticator (RFC 8439, section 2.5) for ARMv8-A.
+//   out[0..16) = Poly1305(key[0..32), m[0..len))
+// The 64x64->128-bit multiplication (`mulu`) is not available in the
+// ARMv8-A back-end of Jasmin 2026.09.0, so the accumulator and the key are
+// held in radix 2^26 (five limbs), where every partial product fits in a
+// 64-bit register (the "donna-32" representation).
+
+param int MASK26 = 0x3ffffff;
+
+// Split a 128-bit little-endian value (lo, hi) into five 26-bit limbs.
+inline
+fn split(reg u64 lo hi) -> reg u64[5] {
+  reg u64[5] l;
+  reg u64 t;
+  l[0] = lo; l[0] &= MASK26;
+  l[1] = lo >> 26; l[1] &= MASK26;
+  l[2] = lo >> 52; t = hi << 12; l[2] |= t; l[2] &= MASK26;
+  l[3] = hi >> 14; l[3] &= MASK26;
+  l[4] = hi >> 40;
+  return l;
+}
+
+// h = (h + block) * r  mod 2^130 - 5   (partially reduced)
+inline
+fn block(reg u64[5] h r, reg u64[4] s, reg u64 lo hi hibit) -> reg u64[5] {
+  reg u64[5] b d;
+  reg u64 c;
+  inline int i;
+
+  b = split(lo, hi);
+  b[4] |= hibit;
+  for i = 0 to 5 { h[i] += b[i]; }
+
+  // s[i] = 5 * r[i + 1]: terms that wrap around 2^130 are multiplied by 5.
+  d[0] = h[0] * r[0]; d[0] += h[1] * s[3]; d[0] += h[2] * s[2]; d[0] += h[3] * s[1]; d[0] += h[4] * s[0];
+  d[1] = h[0] * r[1]; d[1] += h[1] * r[0]; d[1] += h[2] * s[3]; d[1] += h[3] * s[2]; d[1] += h[4] * s[1];
+  d[2] = h[0] * r[2]; d[2] += h[1] * r[1]; d[2] += h[2] * r[0]; d[2] += h[3] * s[3]; d[2] += h[4] * s[2];
+  d[3] = h[0] * r[3]; d[3] += h[1] * r[2]; d[3] += h[2] * r[1]; d[3] += h[3] * r[0]; d[3] += h[4] * s[3];
+  d[4] = h[0] * r[4]; d[4] += h[1] * r[3]; d[4] += h[2] * r[2]; d[4] += h[3] * r[1]; d[4] += h[4] * r[0];
+
+  // carry propagation
+  c = d[0] >> 26; h[0] = d[0]; h[0] &= MASK26; d[1] += c;
+  c = d[1] >> 26; h[1] = d[1]; h[1] &= MASK26; d[2] += c;
+  c = d[2] >> 26; h[2] = d[2]; h[2] &= MASK26; d[3] += c;
+  c = d[3] >> 26; h[3] = d[3]; h[3] &= MASK26; d[4] += c;
+  c = d[4] >> 26; h[4] = d[4]; h[4] &= MASK26;
+  h[0] += c; c = c << 2; h[0] += c;          // h0 += 5 * c (MUL has no immediate)
+  c = h[0] >> 26; h[0] &= MASK26; h[1] += c;
+  return h;
+}
+
+#[ct = "public * public * public * public -> ()"]
+export
+fn poly1305(reg u64 out m len key) {
+  stack u64 s_out s_key;
+  reg u64[5] h r;
+  reg u64[4] s;
+  reg u64 lo hi t c i sh hibit;
+  inline int k;
+
+  s_out = out; s_key = key;
+
+  // r = clamp(key[0..16))
+  lo = [key]; t = 0x0ffffffc0fffffff; lo &= t;
+  hi = [key + 8]; t = 0x0ffffffc0ffffffc; hi &= t;
+  r = split(lo, hi);
+  for k = 0 to 4 { s[k] = r[k + 1]; t = s[k] << 2; s[k] += t; }
+  for k = 0 to 5 { h[k] = 0; }
+
+  // full 16-byte blocks
+  hibit = 1 << 24;
+  while (len >= 16) {
+    lo = [m]; hi = [m + 8];
+    h = block(h, r, s, lo, hi, hibit);
+    m += 16;
+    len -= 16;
+  }
+
+  // final partial block: m[0..len) || 0x01 || zeros, without the 2^128 bit
+  if (len != 0) {
+    lo = 0; hi = 0; i = 0;
+    while (i <= len) {
+      c = 1;
+      if (i < len) { c = (64u)[:u8 m + i]; }
+      sh = i << 3;
+      c = c << (sh & 63);
+      if (i < 8) { lo |= c; } else { hi |= c; }
+      i += 1;
+    }
+    hibit = 0;
+    h = block(h, r, s, lo, hi, hibit);
+  }
+
+  // full carry
+  c = h[1] >> 26; h[1] &= MASK26; h[2] += c;
+  c = h[2] >> 26; h[2] &= MASK26; h[3] += c;
+  c = h[3] >> 26; h[3] &= MASK26; h[4] += c;
+  c = h[4] >> 26; h[4] &= MASK26; h[0] += c; c = c << 2; h[0] += c;
+  c = h[0] >> 26; h[0] &= MASK26; h[1] += c;
+
+  // g = h + 5 - 2^130; select g if g >= 0, in constant time
+  reg u64[5] g;
+  reg u64 mask nmask;
+  g[0] = h[0] + 5; c = g[0] >> 26; g[0] &= MASK26;
+  g[1] = h[1] + c; c = g[1] >> 26; g[1] &= MASK26;
+  g[2] = h[2] + c; c = g[2] >> 26; g[2] &= MASK26;
+  g[3] = h[3] + c; c = g[3] >> 26; g[3] &= MASK26;
+  g[4] = h[4] + c; t = 1 << 26; g[4] -= t;
+  mask = g[4] >> 63;        // 1 if g < 0 (keep h), 0 otherwise (take g)
+  mask -= 1;                // 0 if keep h, all ones if take g
+  nmask = !mask;
+  for k = 0 to 5 { g[k] &= mask; h[k] &= nmask; h[k] |= g[k]; }
+
+  // (h mod 2^128) + key[16..32)  mod 2^128
+  lo = h[1] << 26; lo |= h[0]; t = h[2] << 52; lo |= t;
+  hi = h[2] >> 12; t = h[3] << 14; hi |= t; t = h[4] << 40; hi |= t;
+  key = s_key;
+  reg bool cf;
+  t = [key + 16]; cf, lo += t;
+  t = [key + 24]; _, hi += t + cf;
+  out = s_out;
+  [out] = lo;
+  [out + 8] = hi;
+}

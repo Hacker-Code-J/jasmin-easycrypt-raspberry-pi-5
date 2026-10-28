@@ -1,0 +1,6 @@
+# LaTeX build products
+build.txt
+# Build products of the examples
+examples/jasmin/*.s
+examples/jasmin/test_add256
+examples/easycrypt/*.eco

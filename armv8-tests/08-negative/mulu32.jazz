@@ -1,0 +1,3 @@
+// 32x32->64 multiplication into two registers (mulu_32): internal compiler error.
+// EXPECT: unexpected operator mulu_32
+export fn f(reg u32 x y) -> reg u32, reg u32 { reg u32 hi lo; hi, lo = x * 32u y; return lo, hi; }

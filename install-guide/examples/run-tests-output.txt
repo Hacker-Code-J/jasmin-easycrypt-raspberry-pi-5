@@ -1,0 +1,18 @@
+== Tool versions
+Jasmin Compiler 2026.09.0
+EasyCrypt r2026.07
+known provers: Alt-Ergo@2.6.0, Alt-Ergo[BV]@2.6.0, Alt-Ergo[counterexamples]@2.6.0, CVC5@1.0.3, CVC5[counterexamples]@1.0.3, CVC5[strings]@1.0.3, CVC5[strings+counterexamples]@1.0.3, Z3@4.8.12, Z3[counterexamples]@4.8.12, Z3[noBV]@4.8.12
+== Jasmin
+[PASS] jasminc: compile add256.jazz for ARMv8-A
+[PASS] gcc: link Jasmin assembly with C harness
+[PASS] native run of add256 on the Raspberry Pi 5
+[PASS] jasminc: compile add256.jazz for x86-64 (cross target)
+[PASS] jasmin-ct: ct_select is constant-time
+[PASS] jasmin-ct: leaky_select is rejected
+[PASS] jasmin2ec: extract ct_select to EasyCrypt
+== EasyCrypt
+[PASS] easycrypt: hello.ec (SMT smoke test)
+[PASS] easycrypt: otp.ec (pRHL proof)
+[PASS] easycrypt: ct_select_proof.ec (proof on extracted Jasmin)
+[PASS] easycrypt: wrong.ec is rejected
+== Summary: 11 passed, 0 failed

@@ -1,0 +1,264 @@
+// Instruction-coverage tests for the ARMv8-A back-end of Jasmin.
+// Every export function takes and returns scalars only, so that it can be
+// executed both by the reference interpreter and natively (tools/difftest.py).
+
+// ---------------------------------------------------------------- carries
+// 128-bit addition with the generic carry syntax (ADDS / ADCS).
+export
+fn add128(reg u64 alo ahi blo bhi) -> reg u64, reg u64 {
+  reg bool cf;
+  cf, alo += blo;
+  _, ahi += bhi + cf;
+  return alo, ahi;
+}
+
+// 128-bit subtraction. The generic borrow form (`_, x -= y - cf`) is not
+// supported by this back-end, so we use the A64 carry convention
+// (C = NOT borrow): a - b - borrow = a + ~b + C.
+export
+fn sub128(reg u64 alo ahi blo bhi) -> reg u64, reg u64 {
+  reg bool n z c v;
+  n, z, c, v, alo = #SUBS(alo, blo);
+  bhi = !bhi;
+  ahi = #ADC(ahi, bhi, c);
+  return alo, ahi;
+}
+
+// Carry flag of a subtraction, as seen by Jasmin: returns 1 iff a >= b.
+export
+fn sub_carry(reg u64 a b) -> reg u64 {
+  reg bool n z c v;
+  reg u64 r one;
+  n, z, c, v, a = #SUBS(a, b);
+  r = 0;
+  one = 1;
+  r = one if c;
+  return r;
+}
+
+// ---------------------------------------------------- wide multiplication
+// 64x64 -> 128-bit product built from 32-bit halves (the `mulu` operator is
+// not available on ARMv8-A in Jasmin 2026.09.0). Returns (hi, lo).
+export
+fn mul64x64(reg u64 a b) -> reg u64, reg u64 {
+  reg u64 al ah bl bh ll lh hl hh mid lo hi t;
+  reg bool cf;
+  al = a; al &= 0xffffffff;  ah = a >> 32;
+  bl = b; bl &= 0xffffffff;  bh = b >> 32;
+  ll = al * bl;  lh = al * bh;  hl = ah * bl;  hh = ah * bh;
+  // mid = lh + hl may overflow 64 bits: keep the carry.
+  cf, mid = lh + hl;
+  t = 0;
+  _, t += t + cf;            // t = carry
+  t = t << 32;
+  hh = hh + t;
+  t = mid << 32;
+  cf, lo = ll + t;
+  t = mid >> 32;
+  _, hh += t + cf;
+  hi = hh;
+  return hi, lo;
+}
+
+// Multiply-accumulate forms: MADD / MSUB.
+export
+fn madd_msub(reg u64 a b c) -> reg u64, reg u64 {
+  reg u64 x y;
+  x = c + a * b;
+  y = c - a * b;
+  return x, y;
+}
+
+// ------------------------------------------------------ shifts, rotations
+export
+fn rot64(reg u64 a b) -> reg u64, reg u64 {
+  reg u64 x y n;
+  x = a <<r 13;              // constant rotate left  (= ROR #51)
+  x = x >>r 7;               // constant rotate right
+  x = x >>r b;               // rotate right by register (mod 64)
+  n = 0; n -= b;             // rotate left by register = ROR by -b
+  y = a >>r n;
+  return x, y;
+}
+
+export
+fn rot32(reg u32 a b) -> reg u32 {
+  reg u32 x;
+  x = a <<r 16;
+  x = x <<r 12;
+  x = x <<r 8;
+  x = x <<r 7;               // the four ChaCha20 rotations
+  x = x >>r b;
+  return x;
+}
+
+export
+fn shifts(reg u64 a b) -> reg u64 {
+  reg u64 x y;
+  // Variable shifts must be written with an explicit mask: A64 register
+  // shifts reduce the amount modulo 64, Jasmin's shifts do not.
+  x = a << (b & 63);
+  y = a >> (b & 63);
+  x = x ^ y;
+  y = a >>s (b & 63);
+  x = x + y;
+  x = x ^ (a << 63);         // extreme constant amounts
+  x = x + (a >> 1);
+  return x;
+}
+
+// ---------------------------------------------------------------- logic
+export
+fn logic(reg u64 a b) -> reg u64 {
+  reg u64 x y nb k;
+  nb = !b;                   // MVN
+  x = a & nb;
+  y = a ^ nb;
+  x = x | y;
+  x &= 0x00ff00ff00ff00ff;   // logical bitmask immediate
+  x |= 0x8000000000000001;
+  k = 0x123456789abcdef0;    // not a bitmask immediate: via a register
+  x ^= k;
+  return x;
+}
+
+// Population count (SWAR) -- a typical branch-free bit-twiddling kernel.
+export
+fn popcount(reg u64 a) -> reg u64 {
+  reg u64 t m;
+  m = 0x5555555555555555;
+  t = a >> 1; t &= m; a -= t;
+  m = 0x3333333333333333;
+  t = a >> 2; t &= m; a &= m; a += t;
+  t = a >> 4; a += t;
+  m = 0x0f0f0f0f0f0f0f0f;
+  a &= m;
+  m = 0x0101010101010101;
+  a = a * m;
+  a = a >> 56;
+  return a;
+}
+
+// ---------------------------------------------------------- comparisons
+// Bit i of the result is the outcome of the i-th comparison.
+export
+fn compare(reg u64 a b) -> reg u64 {
+  reg u64 r bit one;
+  reg bool c;
+  r = 0;
+  one = 1;                   // CSEL takes registers only
+  c = a == b;   bit = 0;   bit = one if c;   r |= bit;
+  c = a != b;   bit = 0;   bit = one if c;   r |= bit << 1;
+  c = a < b;    bit = 0;   bit = one if c;   r |= bit << 2;
+  c = a <= b;   bit = 0;   bit = one if c;   r |= bit << 3;
+  c = a > b;    bit = 0;   bit = one if c;   r |= bit << 4;
+  c = a >= b;   bit = 0;   bit = one if c;   r |= bit << 5;
+  c = a <s b;   bit = 0;   bit = one if c;   r |= bit << 6;
+  c = a <=s b;  bit = 0;   bit = one if c;   r |= bit << 7;
+  c = a >s b;   bit = 0;   bit = one if c;   r |= bit << 8;
+  c = a >=s b;  bit = 0;   bit = one if c;   r |= bit << 9;
+  return r;
+}
+
+// ---------------------------------------------------- casts and 32-bit ops
+export
+fn casts(reg u64 a) -> reg u64, reg u64 {
+  reg u32 w k;
+  reg u64 zx sx;
+  w = (32u)a;                // truncation
+  k = 0x80000000;
+  w = w + k;
+  zx = (64u)w;               // zero extension
+  sx = (64s)w;               // sign extension
+  return zx, sx;
+}
+
+export
+fn word32_wrap(reg u32 a b) -> reg u32 {
+  reg u32 x k;
+  x = a * b;
+  k = 0xffffffff;            // 32-bit ADD accepts imm12 only: via a register
+  x = x + k;
+  x = x - (b << 31);
+  x = x >>s 31;
+  return x;
+}
+
+// --------------------------------------------------------------- control
+// Euclid's algorithm with UDIV / MSUB (gcd(a, 0) = a).
+export
+fn gcd(reg u64 a b) -> reg u64 {
+  reg u64 q r;
+  while (b != 0) {
+    q = a / b;
+    r = a - q * b;
+    a = b;
+    b = r;
+  }
+  return a;
+}
+
+// Collatz step count with a nested conditional, bounded by 1000 steps.
+export
+fn collatz(reg u64 n) -> reg u64 {
+  reg u64 steps t;
+  steps = 0;
+  while (n > 1) {
+    if (steps >= 1000) { n = 1; }
+    else {
+      t = n & 1;
+      if (t == 0) { n = n >> 1; } else { t = n + n; n += t; n += 1; }
+      steps += 1;
+    }
+  }
+  return steps;
+}
+
+// ------------------------------------------------- calls and spilling
+fn mix(reg u64 x y) -> reg u64, reg u64 {
+  x = x + y;
+  y = y <<r 17;
+  y = y ^ x;
+  return x, y;
+}
+
+// High register pressure: 26 live values across non-inlined calls force
+// the use of callee-saved registers and stack spills.
+export
+fn pressure(reg u64 a b) -> reg u64 {
+  reg u64 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12;
+  reg u64 v13 v14 v15 v16 v17 v18 v19 v20 v21 v22 v23 r p q k;
+  v0 = a + 1;  v1 = b + 2;  v2 = a ^ b;  v3 = a - b;  k = 3; v4 = a * k;   // MUL has no immediate form
+  k = 5; v5 = b * k;  v6 = a >> 3; v7 = b << 4; v8 = a + b;  v9 = a | b;
+  v10 = a & b; v11 = a * b; v12 = v0 + v1; v13 = v2 + v3; v14 = v4 ^ v5;
+  v15 = v6 - v7; v16 = v8 * v9; v17 = v10 + v11; v18 = v12 ^ v13;
+  v19 = v14 + v15; v20 = v16 - v17; k = 7; v21 = v18 * k; v22 = v19 >> 1; v23 = v20 << 2;
+  // Arguments of a local function live in fixed registers: copy in and out.
+  p = v0; q = v1; p, q = mix(p, q); v0 = p; v1 = q;
+  p = v2; q = v3; p, q = mix(p, q); v2 = p; v3 = q;
+  p = v22; q = v23; p, q = mix(p, q); v22 = p; v23 = q;
+  r = v0 + v1; r ^= v2; r += v3; r ^= v4; r += v5; r ^= v6; r += v7;
+  r ^= v8; r += v9; r ^= v10; r += v11; r ^= v12; r += v13; r ^= v14;
+  r += v15; r ^= v16; r += v17; r ^= v18; r += v19; r ^= v20; r += v21;
+  r ^= v22; r += v23;
+  return r;
+}
+
+// ------------------------------------------------------- stack and arrays
+// Stack array with a (public) dynamic index, and a register array.
+export
+fn arrays(reg u64 a i j) -> reg u64 {
+  stack u64[16] s;
+  reg u64[4] t;
+  reg u64 v;
+  inline int k;
+  for k = 0 to 16 { v = a + k; v = v <<r k; s[k] = v; }
+  for k = 0 to 4 { t[k] = s[k * 3]; }
+  i &= 15;
+  j &= 15;
+  v = s[i];
+  s[j] = v;                  // store through a dynamic index
+  v = s[j];
+  v ^= t[0]; v += t[1]; v ^= t[2]; v += t[3];
+  return v;
+}

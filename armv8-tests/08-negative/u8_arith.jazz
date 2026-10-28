@@ -1,0 +1,3 @@
+// There are no 8/16-bit general-purpose registers on AArch64.
+// EXPECT: Is there an instruction in the target architecture
+export fn f(reg u8 a b) -> reg u8 { a = a + b; a ^= 0x5a; return a; }

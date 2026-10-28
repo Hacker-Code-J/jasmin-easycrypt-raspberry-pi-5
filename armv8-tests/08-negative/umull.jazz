@@ -1,0 +1,3 @@
+// UMULL / UMADDL exist in the EasyCrypt model (JModel_armv8a.ec) but are not Jasmin intrinsics.
+// EXPECT: unknown primitive: .UMULL.
+export fn f(reg u32 a b) -> reg u64 { reg u64 r; r = #UMULL(a, b); return r; }

@@ -1,0 +1,51 @@
+// Speculative constant time (Spectre v1) with Speculative Load Hardening.
+// `jasmin-ct --sct --arch=armv8a` accepts both functions, but jasminc
+// 2026.09.0 cannot compile them for ARMv8-A: the back-end does not provide
+// the SLH primitives yet ("The architecture does not provides protection
+// for selective speculative load hardening"). The same file compiles for
+// x86-64. The test suite checks both facts.
+
+// The same comparison and look-up, hardened with Speculative Load
+// Hardening: a misspeculation flag (msf) is initialised on entry and
+// updated on both sides of every branch, so that `jasmin-ct --sct` accepts
+// them. The loop condition must be bound to a boolean (`while{b = ...}(b)`)
+// for the SLH lowering pass to recognise it.
+#[sct = "transient * transient * transient -> secret"]
+export
+fn sct_memeq(reg u64 a b len) -> reg u64 {
+  reg u64 i acc x y msf;
+  reg bool c;
+  msf = #init_msf();
+  acc = 0;
+  i = 0;
+  while {c = i < len;} (c) {
+    msf = #update_msf(c, msf);
+    x = (64u)[:u8 a + i];
+    y = (64u)[:u8 b + i];
+    x ^= y;
+    acc |= x;
+    i += 1;
+  }
+  msf = #update_msf(!c, msf);
+  acc -= 1;
+  acc >>= 63;
+  return acc;
+}
+
+#[sct = "transient * secret -> secret"]
+export
+fn sct_lookup16(reg u64 table idx) -> reg u64 {
+  reg u64 r v i msf;
+  reg bool c;
+  msf = #init_msf();
+  r = 0;
+  i = 0;
+  while {c = i < 16;} (c) {
+    msf = #update_msf(c, msf);
+    v = [table + 8 * i];
+    r = v if i == idx;
+    i += 1;
+  }
+  msf = #update_msf(!c, msf);
+  return r;
+}

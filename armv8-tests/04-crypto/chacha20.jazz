@@ -1,0 +1,74 @@
+// ChaCha20 block function (RFC 8439, section 2.3) for ARMv8-A.
+//   out[0..64) = ChaCha20_block(key[0..32), counter, nonce[0..12))
+// The 16-word state lives in 32-bit (W) registers; the pointers are kept on
+// the stack during the 20 rounds to leave room for the state.
+
+inline
+fn qr(reg u32[16] x, inline int a b c d) -> reg u32[16] {
+  x[a] += x[b]; x[d] ^= x[a]; x[d] = x[d] <<r 16;
+  x[c] += x[d]; x[b] ^= x[c]; x[b] = x[b] <<r 12;
+  x[a] += x[b]; x[d] ^= x[a]; x[d] = x[d] <<r 8;
+  x[c] += x[d]; x[b] ^= x[c]; x[b] = x[b] <<r 7;
+  return x;
+}
+
+inline
+fn init(reg u64 key nonce, reg u32 counter) -> reg u32[16] {
+  reg u32[16] x;
+  inline int i;
+  x[0] = 0x61707865; x[1] = 0x3320646e; x[2] = 0x79622d32; x[3] = 0x6b206574;
+  for i = 0 to 8 { x[4 + i] = [:u32 key + 4 * i]; }
+  x[12] = counter;
+  for i = 0 to 3 { x[13 + i] = [:u32 nonce + 4 * i]; }
+  return x;
+}
+
+#[ct = "public * public * public * public -> ()"]  // pointers are public; memory is secret
+export
+fn chacha20_block(reg u64 out key nonce, reg u32 counter) {
+  stack u64 s_out s_key s_nonce;
+  stack u32 s_counter;
+  reg u32[16] x y;
+  reg u32 v;
+  reg u64 round;
+  inline int i;
+
+  s_out = out; s_key = key; s_nonce = nonce; s_counter = counter;
+  x = init(key, nonce, counter);
+
+  round = 10;
+  while (round != 0) {
+    x = qr(x, 0, 4,  8, 12);   // column rounds
+    x = qr(x, 1, 5,  9, 13);
+    x = qr(x, 2, 6, 10, 14);
+    x = qr(x, 3, 7, 11, 15);
+    x = qr(x, 0, 5, 10, 15);   // diagonal rounds
+    x = qr(x, 1, 6, 11, 12);
+    x = qr(x, 2, 7,  8, 13);
+    x = qr(x, 3, 4,  9, 14);
+    round -= 1;
+  }
+
+  // Feed-forward: add the initial state, recomputed from memory.
+  key = s_key; nonce = s_nonce; counter = s_counter;
+  out = s_out;
+  for i = 0 to 4 {
+    y[i] = x[i];
+  }
+  v = 0x61707865; y[0] += v;
+  v = 0x3320646e; y[1] += v;
+  v = 0x79622d32; y[2] += v;
+  v = 0x6b206574; y[3] += v;
+  for i = 0 to 4 { [:u32 out + 4 * i] = y[i]; }
+  for i = 0 to 8 {
+    v = [:u32 key + 4 * i];
+    v += x[4 + i];
+    [:u32 out + 16 + 4 * i] = v;
+  }
+  v = x[12]; v += counter; [:u32 out + 48] = v;
+  for i = 0 to 3 {
+    v = [:u32 nonce + 4 * i];
+    v += x[13 + i];
+    [:u32 out + 52 + 4 * i] = v;
+  }
+}

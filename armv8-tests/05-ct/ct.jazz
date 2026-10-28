@@ -1,0 +1,109 @@
+// Constant-time kernels and their leaky counterparts.
+// jasmin-ct must accept every ct_* function and reject every leaky_* one.
+
+// ------------------------------------------------- comparison of buffers
+// Returns 1 if a[0..len) = b[0..len), 0 otherwise, without early exit.
+#[ct = "public * public * public -> secret"]
+export
+fn ct_memeq(reg u64 a b len) -> reg u64 {
+  reg u64 i acc x y;
+  acc = 0;
+  i = 0;
+  while (i < len) {
+    x = (64u)[:u8 a + i];
+    y = (64u)[:u8 b + i];
+    x ^= y;
+    acc |= x;
+    i += 1;
+  }
+  acc -= 1;                  // acc <= 255: borrows only if acc = 0
+  acc >>= 63;
+  return acc;
+}
+
+// Early exit at the first difference: leaks its position through timing.
+#[ct = "public * public * public -> secret"]
+export
+fn leaky_memeq(reg u64 a b len) -> reg u64 {
+  reg u64 i r x y;
+  r = 1;
+  i = 0;
+  while (i < len) {
+    x = (64u)[:u8 a + i];
+    y = (64u)[:u8 b + i];
+    if (x != y) { r = 0; i = len; } else { i += 1; }
+  }
+  return r;
+}
+
+// ---------------------------------------------------- conditional swap
+// Swaps p[0..4) and q[0..4) (64-bit words) iff c = 1, branch-free.
+#[ct = "secret * public * public -> ()"]
+export
+fn ct_cswap4(reg u64 c p q) {
+  reg u64 mask x y t;
+  inline int i;
+  mask = 0;
+  mask -= c;
+  for i = 0 to 4 {
+    x = [p + 8 * i];
+    y = [q + 8 * i];
+    t = x ^ y;
+    t &= mask;
+    x ^= t;
+    y ^= t;
+    [p + 8 * i] = x;
+    [q + 8 * i] = y;
+  }
+}
+
+#[ct = "secret * public * public -> ()"]
+export
+fn leaky_cswap4(reg u64 c p q) {
+  reg u64 x y;
+  inline int i;
+  if (c == 1) {
+    for i = 0 to 4 {
+      x = [p + 8 * i];
+      y = [q + 8 * i];
+      [p + 8 * i] = y;
+      [q + 8 * i] = x;
+    }
+  }
+}
+
+// ---------------------------------------------------- table look-up
+// Returns table[idx] (16 entries) by scanning the whole table.
+#[ct = "public * secret -> secret"]
+export
+fn ct_lookup16(reg u64 table idx) -> reg u64 {
+  reg u64 r v i;
+  reg bool eq;
+  r = 0;
+  i = 0;
+  while (i < 16) {
+    v = [table + 8 * i];
+    eq = i == idx;
+    r = v if eq;               // CSEL: data-independent timing
+    i += 1;
+  }
+  return r;
+}
+
+// Direct indexing with a secret index: the address depends on the secret.
+#[ct = "public * secret -> secret"]
+export
+fn leaky_lookup16(reg u64 table idx) -> reg u64 {
+  reg u64 r;
+  idx &= 15;
+  r = [table + 8 * idx];
+  return r;
+}
+
+// Division by a secret: UDIV timing may depend on its operands.
+#[ct = "secret * secret -> secret"]
+export
+fn leaky_div(reg u64 a b) -> reg u64 {
+  a = a / b;
+  return a;
+}

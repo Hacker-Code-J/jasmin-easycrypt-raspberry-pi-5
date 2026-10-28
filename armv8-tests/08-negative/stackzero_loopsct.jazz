@@ -1,0 +1,4 @@
+// Stack zeroization strategy loopSCT is not supported on ARMv8-A.
+// EXPECT: not supported in ARMv8-A
+#[stackzero=loopSCT]
+export fn f(reg u64 a) -> reg u64 { stack u64 s; s = a; a = s; return a; }

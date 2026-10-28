@@ -1,0 +1,3 @@
+// 64x64->128 multiplication (mulu) is not implemented: internal compiler error (x86-64 compiles it).
+// EXPECT: unexpected operator mulu_64
+export fn f(reg u64 a b) -> reg u64, reg u64 { reg u64 hi lo; hi, lo = a * 64u b; return lo, hi; }

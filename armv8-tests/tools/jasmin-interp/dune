@@ -1,0 +1,3 @@
+(executable
+ (name jasmin_interp)
+ (libraries jasmin.jasmin zarith))

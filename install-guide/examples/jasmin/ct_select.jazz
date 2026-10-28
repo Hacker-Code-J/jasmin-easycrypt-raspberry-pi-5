@@ -1,0 +1,24 @@
+// Constant-time conditional selection: return a if c = 1, b if c = 0.
+// The secret bit c must never influence control flow or memory addresses.
+
+// Branch-free version: builds an all-ones / all-zeros mask from c.
+#[ct = "secret * secret * secret -> secret"]
+export
+fn ct_select(reg u64 c a b) -> reg u64 {
+  reg u64 mask r t;
+  mask = 0;
+  mask -= c;          // mask = 0xff..ff if c = 1, 0 if c = 0
+  r = a & mask;
+  t = b & !mask;
+  r |= t;
+  return r;
+}
+
+// Leaky version: branches on the secret bit (rejected by jasmin-ct).
+#[ct = "secret * secret * secret -> secret"]
+export
+fn leaky_select(reg u64 c a b) -> reg u64 {
+  reg u64 r;
+  if (c == 1) { r = a; } else { r = b; }
+  return r;
+}
